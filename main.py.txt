@@ -1,0 +1,1 @@
+print("Where Is My Book - SIFT Detector project started")

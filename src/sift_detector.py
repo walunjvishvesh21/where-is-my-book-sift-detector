@@ -1,3 +1,25 @@
+#We used external resources such as Google Gemini, Stack Overflow, and certain YouTube videos,
+#  along with the course lecture slides, to strengthen our conceptual understanding of SIFT,
+#  feature matching, homography, and the overall computer vision pipeline. 
+# These resources were used only to understand the concepts, clarify doubts, and learn
+#  how classical object detection methods behave under scale, rotation, perspective, clutter,
+#  and lighting variation. The coding for this project was done by us; we did not use AI tools 
+# to generate the project code. One of the most interesting parts of the project was 
+# working with SIFT itself, because it showed how a classical feature-based method can 
+# still perform strong object matching in real-world scenes. We were especially curious 
+# about using our own dataset instead of a ready-made dataset, and that became the most
+#  fun part of the project. We spent a good amount of time collecting photos under different
+#  lighting conditions, viewing angles, rotations, and cluttered table arrangements. 
+# It was particularly interesting to test how the system would behave when three notebooks
+#  with somewhat similar building-style covers were present, since that made the task more 
+# challenging and realistic. One of the more difficult parts to implement was the 
+# homography-based detection stage, especially deciding when the matched points were 
+# geometrically consistent enough to confirm a real detection and draw the final bounding box.
+#  We encountered confusion and trial-and-error in that part, but after referring to 
+# Stack Overflow discussions and explanatory videos, we got a clearer idea of the logic and
+#  were able to complete the implementation ourselves.
+
+
 import os
 import cv2
 import csv
@@ -15,11 +37,12 @@ RATIO_TEST_THRESHOLD = 0.75
 MIN_GOOD_MATCHES = 150
 MIN_INLIERS = 120
 
-
+# Our first step here is we are creating a results folder if it does not already exist.
+# This will store all of our results images, csv etc.
 def ensure_results_folder():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-
+# Now this function will return sorted list of valid image file paths from folder
 def get_image_paths(folder_path):
     valid_extensions = (".jpg", ".jpeg", ".png", ".bmp")
     files = []
@@ -30,27 +53,38 @@ def get_image_paths(folder_path):
 
     return sorted(files)
 
-
+# Now since SIFT works on intensity patterns and not colours and
+# Feature detection is typically more stable and simpler in grayscale
+# we loaded an image in Grayscale for our SIFT feature detection
 def load_image_gray(image_path):
     image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
     if image is None:
         raise ValueError(f"Could not load image: {image_path}")
     return image
 
-
+# Now this function below loads an image in normal colour
+# Now grayscale we used was for detection but for visualization we use colour images
+# SO we load image in colour for drawing results from visualization
 def load_image_color(image_path):
     image = cv2.imread(image_path, cv2.IMREAD_COLOR)
     if image is None:
         raise ValueError(f"Could not load image: {image_path}")
     return image
 
-
+# Now we wanted to find the key-points and descriptors
+# This was the core step i believe because without descriptors there is nothing to match
+# SO this function below detects keypoints and descriptors from a gray scale image
 def detect_sift_features(gray_image):
     sift = cv2.SIFT_create()
     keypoints, descriptors = sift.detectAndCompute(gray_image, None)
     return keypoints, descriptors
 
 
+# Now we used match_descriptors to match descriptors between two images using:
+# BF MATCHER (Brute force using one descriptor againts many descriptors in other images and finding the closest one)
+#  and Lowe's Ratio test( for each descriptor it finds the best match and second best match)
+# We used ratio test to remove ambiguous matches
+# SO basically we matched descriptors using BF Matcher and only kept relaible matches using LOWE's ratio test.
 def match_descriptors(desc1, desc2):
     bf = cv2.BFMatcher()
     knn_matches = bf.knnMatch(desc1, desc2, k=2)
@@ -67,6 +101,9 @@ def match_descriptors(desc1, desc2):
     return good_matches
 
 
+# We created this function cause we all know raw matches alone cant prove object presence
+# so what homography does is If the target book is rotated in the scene, homography can still map its corners properly.
+# we  Estimated homography with RANSAC and to identify geometrically consistent inlier matches
 def compute_homography(kp1, kp2, good_matches):
     if len(good_matches) < 4:
         return None, None
@@ -77,7 +114,9 @@ def compute_homography(kp1, kp2, good_matches):
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
     return H, mask
 
-
+# Now this function below just matches inliner between reference and test image.
+# Now raw matches are quite noisy so inliner matches are more trustworthy.
+# so we drew  saved only the geometrically consistent inlier matches between two images
 def draw_inlier_matches(ref_img, ref_kp, test_img, test_kp, good_matches, mask, save_path):
     if mask is None:
         return
@@ -100,6 +139,10 @@ def draw_inlier_matches(ref_img, ref_kp, test_img, test_kp, good_matches, mask, 
     cv2.imwrite(save_path, result)
 
 
+# this function below uses homography to project the 4 corners of the reference image onto the test image 
+# and draw a green box/polygon.
+#  so If homography is correct, then the reference book’s corners should map to where the actual book is in the scene.
+# this function projects the reference image corners into the test image and draws a detection box
 def draw_detected_box(ref_gray, test_color, H, save_path):
     h, w = ref_gray.shape
 
@@ -123,7 +166,8 @@ def draw_detected_box(ref_gray, test_color, H, save_path):
 
     cv2.imwrite(save_path, boxed_image)
 
-
+# This was one of the main core functions.
+# cause it compares one reference image with one test image and return match, homography, and detection results
 def evaluate_reference_vs_test(reference_path, test_path):
     ref_gray = load_image_gray(reference_path)
     test_gray = load_image_gray(test_path)
@@ -201,7 +245,8 @@ def evaluate_reference_vs_test(reference_path, test_path):
         "inlier_image": inlier_image_path
     }
 
-
+# Now we needed to choose the best result with not just one but 5 reference images so
+# so this function Compares a test image against all reference images and return the best matching result
 def evaluate_against_all_references(reference_paths, test_path):
     all_results = []
 
@@ -212,7 +257,7 @@ def evaluate_against_all_references(reference_paths, test_path):
     best_result = max(all_results, key=lambda x: (x["inliers"], x["good_matches"]))
     return best_result, all_results
 
-
+# then we  Saved the  final image-level detection results to a CSV file
 def save_results_to_csv(rows):
     fieldnames = [
         "image_name",
@@ -230,6 +275,7 @@ def save_results_to_csv(rows):
             writer.writerow(row)
 
 
+# we also created and saved a confusion matrix image using final classification counts
 def save_confusion_matrix(tp, fn, fp, tn, save_path):
     matrix = [
         [tp, fn],
@@ -252,7 +298,8 @@ def save_confusion_matrix(tp, fn, fp, tn, save_path):
     plt.savefig(save_path)
     plt.close()
 
-
+# This is the overall controller of our entire project.
+# It basically runs the full dataset evaluation pipeline and prints the  final detection performance metrics
 def main():
     ensure_results_folder()
 

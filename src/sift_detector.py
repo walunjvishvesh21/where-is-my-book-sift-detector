@@ -10,8 +10,9 @@ NEGATIVE_DIR = "data/negative"
 RESULTS_DIR = "results"
 CSV_PATH = os.path.join(RESULTS_DIR, "detection_results.csv")
 
-MIN_INLIERS = 20
 RATIO_TEST_THRESHOLD = 0.75
+MIN_GOOD_MATCHES = 150
+MIN_INLIERS = 120
 
 
 def ensure_results_folder():
@@ -21,9 +22,11 @@ def ensure_results_folder():
 def get_image_paths(folder_path):
     valid_extensions = (".jpg", ".jpeg", ".png", ".bmp")
     files = []
+
     for file_name in os.listdir(folder_path):
         if file_name.lower().endswith(valid_extensions):
             files.append(os.path.join(folder_path, file_name))
+
     return sorted(files)
 
 
@@ -55,6 +58,7 @@ def match_descriptors(desc1, desc2):
     for pair in knn_matches:
         if len(pair) < 2:
             continue
+
         m, n = pair
         if m.distance < RATIO_TEST_THRESHOLD * n.distance:
             good_matches.append(m)
@@ -78,18 +82,18 @@ def draw_inlier_matches(ref_img, ref_kp, test_img, test_kp, good_matches, mask, 
         return
 
     matches_mask = mask.ravel().tolist()
-    draw_params = dict(
+
+    result = cv2.drawMatches(
+        ref_img,
+        ref_kp,
+        test_img,
+        test_kp,
+        good_matches,
+        None,
         matchColor=(0, 255, 0),
         singlePointColor=None,
         matchesMask=matches_mask,
         flags=2
-    )
-
-    result = cv2.drawMatches(
-        ref_img, ref_kp,
-        test_img, test_kp,
-        good_matches, None,
-        **draw_params
     )
 
     cv2.imwrite(save_path, result)
@@ -97,6 +101,7 @@ def draw_inlier_matches(ref_img, ref_kp, test_img, test_kp, good_matches, mask, 
 
 def draw_detected_box(ref_gray, test_color, H, save_path):
     h, w = ref_gray.shape
+
     corners = np.float32([
         [0, 0],
         [0, h - 1],
@@ -149,7 +154,11 @@ def evaluate_reference_vs_test(reference_path, test_path):
     if homography_found:
         inliers = int(mask.sum())
 
-    detected = homography_found and inliers >= MIN_INLIERS
+    detected = (
+        homography_found
+        and len(good_matches) >= MIN_GOOD_MATCHES
+        and inliers >= MIN_INLIERS
+    )
 
     test_base = os.path.splitext(os.path.basename(test_path))[0]
     ref_base = os.path.splitext(os.path.basename(reference_path))[0]
@@ -165,9 +174,12 @@ def evaluate_reference_vs_test(reference_path, test_path):
 
     if homography_found:
         draw_inlier_matches(
-            load_image_color(reference_path), ref_kp,
-            load_image_color(test_path), test_kp,
-            good_matches, mask,
+            load_image_color(reference_path),
+            ref_kp,
+            load_image_color(test_path),
+            test_kp,
+            good_matches,
+            mask,
             inlier_image_path
         )
         draw_detected_box(ref_gray, test_color, H, box_image_path)
@@ -236,7 +248,10 @@ def main():
 
     results_rows = []
 
-    tp = fn = fp = tn = 0
+    tp = 0
+    fn = 0
+    fp = 0
+    tn = 0
 
     print("----- PROCESSING POSITIVE IMAGES -----")
     for pos_path in positive_paths:

@@ -2,6 +2,7 @@ import os
 import cv2
 import csv
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 REFERENCE_DIR = "data/reference"
@@ -229,6 +230,29 @@ def save_results_to_csv(rows):
             writer.writerow(row)
 
 
+def save_confusion_matrix(tp, fn, fp, tn, save_path):
+    matrix = [
+        [tp, fn],
+        [fp, tn]
+    ]
+
+    plt.figure(figsize=(6, 5))
+    plt.imshow(matrix, cmap="Blues")
+
+    plt.xticks([0, 1], ["Predicted Positive", "Predicted Negative"])
+    plt.yticks([0, 1], ["Actual Positive", "Actual Negative"])
+
+    for i in range(2):
+        for j in range(2):
+            plt.text(j, i, str(matrix[i][j]), ha="center", va="center", fontsize=14)
+
+    plt.title("Confusion Matrix")
+    plt.colorbar()
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
+
 def main():
     ensure_results_folder()
 
@@ -326,3 +350,7 @@ def main():
     print(f"Accuracy : {accuracy:.4f}")
     print(f"Precision: {precision:.4f}")
     print(f"Recall   : {recall:.4f}")
+
+    confusion_matrix_path = os.path.join(RESULTS_DIR, "confusion_matrix.png")
+    save_confusion_matrix(tp, fn, fp, tn, confusion_matrix_path)
+    print(f"Confusion matrix saved to: {confusion_matrix_path}")

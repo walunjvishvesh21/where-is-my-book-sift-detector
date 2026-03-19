@@ -86,3 +86,58 @@ conda activate bookdetect
 
 python -m pip install -r requirements.txt
 python main.py
+
+
+
+## Project Structure
+
+## This repository is organized into folders for dataset images, source code, generated results, and project documents.
+
+ data/reference/
+## Contains the 5 reference images of the target red notebook used for matching:
+
+## REFERENCE_IMAGE_FRONT.jpeg
+
+## REFERENCE_IMAGE_ANGLE.jpeg
+
+## REFERENCE_IMAGE_ROTATED.jpeg
+
+## REFERENCE_IMAGE_PERSPECTIVE.jpeg
+
+## REFERENCE_IMAGE_4_SCALED.png
+
+data/positive/
+## Contains the 20 positive test images in which the target notebook is present.
+
+data/negative/
+## Contains the 11 negative test images in which the target notebook is absent.
+
+src/
+## Contains the main implementation file:
+
+sift_detector.py — handles feature extraction, matching, RANSAC filtering, homography estimation, final detection, and evaluation.
+
+results/
+## Stores all generated outputs from the project, including:
+
+match visualization images
+
+inlier match images after RANSAC
+
+final boxed detection images
+
+detection_results.csv
+
+confusion_matrix.png
+
+docs/
+ ## Used for project documents such as the proposal, report, and presentation materials.
+
+main.py
+## Entry point used to run the full detection and evaluation pipeline.
+
+requirements.txt
+## Lists the Python libraries required to run the project.
+
+README.md
+Provides the project overview, setup instructions, and usage details.
